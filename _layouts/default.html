@@ -134,17 +134,45 @@
     .meta .v.ok { color: var(--ok); }
     .meta .v.amber { color: var(--amber); }
 
-    /* ---- shell / article ---- */
-    .shell { max-width: var(--shell); margin: 0 auto; padding: 3rem 2rem 5rem; }
-    @media (min-width: 90rem) { .shell { padding-left: 3.5rem; padding-right: 3.5rem; } }
-    article { max-width: var(--read); }
-    article > pre, article > table, article > .mermaid, article > .meta, article > .hero,
-    article > p:has(> img) { max-width: var(--shell); width: 100%; }
+    /* ---- shell: trace rail + one readable column ---- */
+    .shell { max-width: 62rem; margin: 0 auto; padding: 3rem 2rem 5rem;
+             display: grid; grid-template-columns: minmax(0, 1fr); gap: 2.5rem; }
+    @media (min-width: 1024px) {
+      .shell { grid-template-columns: 12.5rem minmax(0, 44rem); gap: 3rem;
+               justify-content: center; padding-top: 3.5rem; }
+      /* pages with too few sections to navigate: single centred column, no empty rail */
+      .shell:has(.trace:empty) { grid-template-columns: minmax(0, 46rem); }
+    }
+    article { min-width: 0; }
+    article > * { max-width: 100%; }
 
-    /* index.md has no h1 rendered by layout chrome; article content owns its own h1 */
+    /* ---- trace rail (section navigator, styled as an incident trace) ---- */
+    .trace { display: none; }
+    @media (min-width: 1024px) {
+      .trace:not(:empty) {
+        display: block; position: sticky; top: 5rem; align-self: start;
+        max-height: calc(100vh - 7rem); overflow-y: auto;
+      }
+    }
+    .trace-label { font-size: 0.62rem; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--faint); margin-bottom: 0.9rem; padding-left: 0.8rem; }
+    .trace-label::before { content: "// "; color: var(--line-2); }
+    .trace ol { list-style: none; margin: 0; padding: 0; counter-reset: tr; }
+    .trace li { margin: 0; }
+    .trace a { display: flex; gap: 0.5rem; align-items: baseline;
+      padding: 0.34rem 0.4rem 0.34rem 0.8rem; font-size: 0.77rem; line-height: 1.45;
+      color: var(--dim); text-decoration: none; border-left: 1px solid var(--line); }
+    .trace a .n { flex: none; font-size: 0.66rem; color: var(--faint); }
+    .trace a .n::before { counter-increment: tr; content: "[" counter(tr, decimal-leading-zero) "]"; }
+    .trace a:hover { color: var(--ink); border-left-color: var(--line-2); }
+    .trace a.active { color: var(--alert); border-left-color: var(--alert);
+      box-shadow: -1px 0 8px -2px var(--alert-dim); }
+    .trace a.active .n { color: var(--alert); }
+
+    /* index.md content owns its own h1 (no layout chrome h1) */
     article > h1:first-child { font-size: clamp(1.9rem, 1.5rem + 1.6vw, 2.6rem); font-weight: 800;
-      letter-spacing: -0.02em; line-height: 1.1; margin: 0 0 0.9rem; max-width: var(--shell); }
-    article > h1:first-child + p { color: var(--dim); font-size: 1rem; max-width: var(--read); margin-bottom: 2.2rem; }
+      letter-spacing: -0.02em; line-height: 1.1; margin: 0 0 0.9rem; }
+    article > h1:first-child + p { color: var(--dim); font-size: 1rem; margin-bottom: 2.2rem; }
 
     a { color: var(--amber); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.16em;
         text-decoration-color: color-mix(in oklab, var(--amber) 45%, transparent); }
@@ -241,6 +269,7 @@
   </header>
 
   <div class="shell">
+    <aside class="trace" id="trace" aria-label="Sections"></aside>
     <article>
       {{ content }}
     </article>
@@ -262,14 +291,48 @@
         host.replaceWith(div);
       });
       var theme = {
-        primaryColor: "#17191c", primaryBorderColor: "#ff4433", primaryTextColor: "#e9ebed",
-        lineColor: "#8a9099", secondaryColor: "#121417", tertiaryColor: "#0a0b0d",
+        primaryColor: "#15181c", primaryBorderColor: "#3a4048", primaryTextColor: "#e9ebed",
+        lineColor: "#7f868f", secondaryColor: "#121417", tertiaryColor: "#0e1013",
         fontSize: "14px"
       };
       theme.fontFamily = '"JetBrains Mono", ui-monospace, monospace';
       mermaid.initialize({ startOnLoad: false, securityLevel: "loose", theme: "base",
                            themeVariables: theme, flowchart: { curve: "basis", padding: 12 } });
       mermaid.run({ querySelector: ".mermaid" });
+
+      // Build the trace rail from section headings (skip the lead h1).
+      var heads = Array.prototype.slice.call(document.querySelectorAll("article h2"));
+      var trace = document.getElementById("trace");
+      if (trace && heads.length > 2) {
+        var label = document.createElement("div");
+        label.className = "trace-label"; label.textContent = "trace";
+        var ol = document.createElement("ol");
+        heads.forEach(function (h) {
+          if (!h.id) { h.id = h.textContent.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, ""); }
+          var li = document.createElement("li");
+          var a = document.createElement("a");
+          a.href = "#" + h.id;
+          var n = document.createElement("span"); n.className = "n";
+          var t = document.createElement("span");
+          t.textContent = h.textContent.replace(/^\s*\[?\d+\]?[.)]?\s*/, "");
+          a.appendChild(n); a.appendChild(t);
+          li.appendChild(a); ol.appendChild(li);
+        });
+        trace.appendChild(label); trace.appendChild(ol);
+
+        // Scroll-spy: highlight the section currently in view.
+        var links = {};
+        ol.querySelectorAll("a").forEach(function (a) { links[a.getAttribute("href").slice(1)] = a; });
+        var spy = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) {
+              Object.values(links).forEach(function (a) { a.classList.remove("active"); });
+              if (links[e.target.id]) links[e.target.id].classList.add("active");
+            }
+          });
+        }, { rootMargin: "-10% 0px -80% 0px" });
+        heads.forEach(function (h) { spy.observe(h); });
+      }
     });
   </script>
 </body>
