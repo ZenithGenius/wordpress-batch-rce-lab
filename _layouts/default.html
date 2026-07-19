@@ -32,7 +32,7 @@
       --amber:     #ffb020;   /* CVE ids, secondary emphasis */
 
       --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-      --shell: 64rem;
+      --shell: 70rem;
       --read: 40rem;
     }
 
@@ -41,12 +41,31 @@
     @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
     body {
-      margin: 0; color: var(--ink);
+      margin: 0; color: var(--ink); min-height: 100vh;
       font-family: var(--mono); font-size: 1rem; line-height: 1.7;
       font-weight: 400; letter-spacing: -0.005em;
       background: var(--void);
       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
     }
+    /* Ambient full-viewport texture so wide screens don't read as dead space
+       around a centered card: faint grid + a soft glow anchored top-center. */
+    body::before {
+      content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none;
+      background:
+        radial-gradient(60rem 32rem at 50% 0%, color-mix(in oklab, var(--alert) 6%, transparent), transparent 70%),
+        linear-gradient(color-mix(in oklab, white 3%, transparent) 1px, transparent 1px) 0 0/100% 44px,
+        linear-gradient(90deg, color-mix(in oklab, white 3%, transparent) 1px, transparent 1px) 0 0/44px 100%;
+      -webkit-mask-image: radial-gradient(120vmax 90vmax at 50% 0%, black 45%, transparent 92%);
+      mask-image: radial-gradient(120vmax 90vmax at 50% 0%, black 45%, transparent 92%);
+    }
+    /* HUD corner frame: gives the viewport a purpose instead of empty void. */
+    .hud i { position: fixed; z-index: -1; width: 22px; height: 22px; pointer-events: none;
+             border-color: var(--line-2); border-style: solid; border-width: 0; opacity: 0.85; }
+    .hud .tl { top: 14px; left: 14px; border-top-width: 1px; border-left-width: 1px; }
+    .hud .tr { top: 14px; right: 14px; border-top-width: 1px; border-right-width: 1px; }
+    .hud .bl { bottom: 14px; left: 14px; border-bottom-width: 1px; border-left-width: 1px; }
+    .hud .br { bottom: 14px; right: 14px; border-bottom-width: 1px; border-right-width: 1px; }
+    @media (max-width: 640px) { .hud { display: none; } }
 
     main { animation: rise 0.4s ease-out both; }
     @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
@@ -64,10 +83,10 @@
       border-bottom: 1px solid var(--line);
     }
     .masthead-in {
-      max-width: var(--shell); margin: 0 auto;
-      padding: 0.95rem 1.5rem; display: flex; align-items: baseline;
+      padding: 0.95rem 2rem; display: flex; align-items: baseline;
       justify-content: space-between; gap: 1rem; flex-wrap: wrap;
     }
+    @media (min-width: 90rem) { .masthead-in { padding-left: 3.5rem; padding-right: 3.5rem; } }
     .brand { font-weight: 700; font-size: 0.92rem; letter-spacing: -0.01em; color: var(--ink); text-decoration: none; }
     .brand b { color: var(--alert); font-weight: 700; }
     .masthead-in nav { display: flex; gap: 1.3rem; font-size: 0.78rem; }
@@ -116,7 +135,8 @@
     .meta .v.amber { color: var(--amber); }
 
     /* ---- shell / article ---- */
-    .shell { max-width: var(--shell); margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+    .shell { max-width: var(--shell); margin: 0 auto; padding: 3rem 2rem 5rem; }
+    @media (min-width: 90rem) { .shell { padding-left: 3.5rem; padding-right: 3.5rem; } }
     article { max-width: var(--read); }
     article > pre, article > table, article > .mermaid, article > .meta, article > .hero,
     article > p:has(> img) { max-width: var(--shell); width: 100%; }
@@ -206,6 +226,7 @@
   </style>
 </head>
 <body>
+  <div class="hud" aria-hidden="true"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i></div>
   <header class="masthead">
     <div class="masthead-in">
       <a class="brand" href="{{ '/' | relative_url }}"><b>wp2shell</b>_<span class="cursor" aria-hidden="true"></span></a>
