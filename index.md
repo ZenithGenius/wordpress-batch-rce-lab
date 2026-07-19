@@ -27,6 +27,8 @@ flowchart TB
     G --> H["remote code execution"]
 ```
 
+> **[Try the interactive desync playground.](./playground.html)** Break a batch sub-request and watch WordPress's `$requests` and `$matches` arrays fall out of alignment in real time, then toggle the one-line fix and watch them snap back. It runs the real array logic in your browser.
+
 ## Read the writeup
 
 **[The batch mechanism](./analysis/mechanism.html).** How `WP_REST_Server::serve_batch_request_v1()` builds two parallel arrays, how one malformed sub-request desyncs them, and the exact one-line diff between vulnerable 7.0.1 and patched 7.0.2. Includes a live, safe proof against genuinely vulnerable WordPress: the same request, on the same server, answering wrong before the patch and right after it.

@@ -1,5 +1,6 @@
 ---
 title: "The bug class"
+og_image: /assets/og/bug-class.png
 description: "Both wp2shell bugs are the same shape: a safety guarantee that holds on the common path and is silently dropped on an edge path. Why request-multiplexing endpoints breed the array-desync variant, and the defensive lessons that generalize past this one CVE."
 ---
 

@@ -1,11 +1,16 @@
 ---
 title: "The mechanism"
+og_image: /assets/og/mechanism.png
 description: "How WP_REST_Server::serve_batch_request_v1() desyncs two parallel arrays, the exact one-line diff between vulnerable and patched WordPress, and a live, safe proof against a real vulnerable instance."
 ---
 
 # The mechanism
 
 wp2shell is two chained CVEs. CVE-2026-63030 is a logic bug in WordPress core's REST API batch endpoint that lets one sub-request dispatch under a different sub-request's route and permission check. CVE-2026-60137 is a SQL injection that becomes reachable, unauthenticated, once the permission check has been bypassed. This piece covers the first bug in full, because it is fully understood, safely reproducible, and the interesting part: a single missing line in an array-building loop.
+
+![Animation: $requests and $matches start index-aligned. One malformed sub-request appends to $validation but not $matches, so $matches becomes one row shorter and every later row shifts up. Request 1, /wp/v2/settings, then dispatches against /nonexistent's handler (DESYNCED). Appending the error to $matches too realigns every row (ALIGNED).](../assets/wp2shell-desync.gif)
+
+*Prefer to poke it yourself? The [desync playground](../playground.html) runs this exact array logic in your browser: break a sub-request and watch the rows drift, then toggle the fix.*
 
 ## What the batch endpoint does
 

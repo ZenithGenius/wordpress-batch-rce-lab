@@ -1,5 +1,6 @@
 ---
 title: "The SQL injection half"
+og_image: /assets/og/sqli-chain.png
 description: "CVE-2026-60137: an is_array-gated sanitization bypass in WP_Query's author__not_in parameter, how it reaches SQL, and how the batch desync turns an authenticated-only bug into an unauthenticated one."
 ---
 

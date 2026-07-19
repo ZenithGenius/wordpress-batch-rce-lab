@@ -1,5 +1,6 @@
 ---
 title: "Detecting wp2shell exploitation"
+og_image: /assets/og/detection.png
 description: "Log signatures, request fingerprints, and hunting queries for CVE-2026-63030 batch-endpoint abuse, plus what a benign batch call looks like so you can tell them apart."
 ---
 
@@ -85,6 +86,8 @@ The lab ships ready-to-run rules in [`batch-rce-lab/detect/`](https://github.com
   the batch desync by observing that `/wp/v2/settings` answers with the wrong route's
   error. It sends only read/validation sub-requests and was verified to fire on a
   vulnerable instance and stay silent on a patched one.
+
+![Terminal recording: the Nuclei template run against a target. On the vulnerable server it reports a critical wp2shell-batch-desync finding; after patching to WordPress 7.0.2 the same run reports no results found, target is not vulnerable.](../assets/wp2shell-nuclei.gif)
 
 ## After the fact
 

@@ -1,5 +1,6 @@
 ---
 title: "Indicators and mitigation"
+og_image: /assets/og/iocs.png
 description: "Request fingerprints, WAF rules for nginx/Apache/ModSecurity, and a drop-in mu-plugin for CVE-2026-63030, the WordPress REST batch-endpoint array desync."
 ---
 

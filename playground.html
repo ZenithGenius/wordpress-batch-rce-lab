@@ -1,0 +1,271 @@
+---
+title: "Desync playground"
+description: "Interactive: break a batch sub-request and watch WordPress's $requests and $matches arrays fall out of alignment, dispatching one request under another's handler. Toggle the one-line fix and watch them snap back."
+og_image: /assets/og/mechanism.png
+---
+
+<h1>Desync playground</h1>
+
+<p>This is the <a href="./analysis/mechanism.html">batch desync</a> (CVE-2026-63030) you can poke. Mark any sub-request's path as <strong>malformed</strong> and watch <code>$matches</code> lose a row, so every later request lines up with the wrong handler. Flip <strong>Apply the fix</strong> to add the one missing line and see the rows realign. Nothing here talks to a server; it runs the real array logic in your browser.</p>
+
+<div class="pg">
+  <div class="pg-bar">
+    <button id="pg-fix" class="pg-btn pg-fix" aria-pressed="false">Apply the fix (7.0.2): <b>OFF</b></button>
+    <button id="pg-add" class="pg-btn">+ add sub-request</button>
+    <button id="pg-reset" class="pg-btn">reset</button>
+  </div>
+
+  <div class="pg-edit" id="pg-edit"></div>
+
+  <div class="pg-stage">
+    <svg class="pg-wires" id="pg-wires" aria-hidden="true"></svg>
+    <div class="pg-colwrap">
+      <div class="pg-collabel">$requests</div>
+      <div class="pg-col" id="pg-req"></div>
+    </div>
+    <div class="pg-colwrap">
+      <div class="pg-collabel">$matches <span id="pg-matnote"></span></div>
+      <div class="pg-col" id="pg-mat"></div>
+    </div>
+  </div>
+
+  <div class="pg-verdict" id="pg-verdict"></div>
+</div>
+
+<style>
+  .pg { margin: 1.8rem 0 1rem; }
+  .pg-bar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
+  .pg-btn {
+    font-family: var(--mono); font-size: 0.82rem; color: var(--dim);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    padding: 0.5rem 0.85rem; cursor: pointer; transition: border-color .15s, color .15s;
+  }
+  .pg-btn:hover { color: var(--ink); border-color: var(--line-2); }
+  .pg-btn.pg-fix { border-color: var(--line-2); }
+  .pg-btn.pg-fix[aria-pressed="true"] { color: var(--ok); border-color: var(--ok); box-shadow: 0 0 0 1px color-mix(in oklab, var(--ok) 40%, transparent) inset; }
+  .pg-btn.pg-fix[aria-pressed="true"] b { color: var(--ok); }
+  .pg-btn.pg-fix b { color: var(--alert); }
+
+  .pg-edit { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.4rem; }
+  .pg-chip {
+    display: flex; align-items: center; gap: 0.7rem; font-size: 0.82rem;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 0.4rem 0.6rem;
+  }
+  .pg-chip .idx { color: var(--faint); font-size: 0.72rem; flex: none; width: 2rem; }
+  .pg-chip .path { color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pg-chip.broken .path { color: var(--alert); text-decoration: line-through; text-decoration-color: color-mix(in oklab, var(--alert) 60%, transparent); }
+  .pg-chip label { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--dim); cursor: pointer; flex: none; font-size: 0.76rem; }
+  .pg-chip input { accent-color: var(--alert); }
+  .pg-x { color: var(--faint); cursor: pointer; border: none; background: none; font-family: var(--mono); font-size: 0.95rem; padding: 0 0.2rem; }
+  .pg-x:hover { color: var(--alert); }
+
+  .pg-stage { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 5.5rem; }
+  .pg-wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
+  .pg-colwrap { min-width: 0; z-index: 2; }
+  .pg-collabel { font-family: var(--mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); margin-bottom: 0.6rem; }
+  .pg-collabel span { color: var(--alert); text-transform: none; letter-spacing: 0; }
+  .pg-col { display: flex; flex-direction: column; gap: 0.6rem; }
+  .pg-cell {
+    display: flex; align-items: center; gap: 0.6rem; min-height: 3rem; box-sizing: border-box;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem 0.7rem;
+    font-size: 0.82rem;
+  }
+  .pg-cell .cidx { color: var(--faint); font-size: 0.72rem; flex: none; }
+  .pg-cell .body { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pg-cell.err { border-color: var(--alert-dim); }
+  .pg-cell.err .body { color: var(--alert); }
+  .pg-cell.mism { border-color: var(--alert); box-shadow: 0 0 0 1px color-mix(in oklab, var(--alert) 30%, transparent) inset; }
+  .pg-cell.okrow { border-color: color-mix(in oklab, var(--ok) 45%, transparent); }
+  .pg-cell.empty { border-style: dashed; color: var(--faint); }
+  .pg-cell .tag { margin-left: auto; font-size: 0.68rem; flex: none; }
+  .pg-cell .tag.bad { color: var(--alert); }
+  .pg-cell .tag.good { color: var(--ok); }
+
+  .pg-verdict { margin-top: 1.5rem; padding: 0.9rem 1.1rem; border-radius: 6px; font-size: 0.9rem;
+    border: 1px solid var(--line); background: var(--panel); }
+  .pg-verdict.bad { border-color: var(--alert); color: var(--alert); }
+  .pg-verdict.good { border-color: var(--ok); color: var(--ok); }
+  @media (max-width: 640px) { .pg-stage { gap: 3rem; } }
+</style>
+
+<script>
+(function () {
+  var fixed = false;
+  var requests = [
+    { path: "http://:",              broken: true  },
+    { path: "/wp/v2/settings",       broken: false },
+    { path: "/wp/v2/comments/42",    broken: false },
+    { path: "/nonexistent-route",    broken: false }
+  ];
+
+  var elEdit = document.getElementById("pg-edit");
+  var elReq  = document.getElementById("pg-req");
+  var elMat  = document.getElementById("pg-mat");
+  var elWires= document.getElementById("pg-wires");
+  var elVerdict = document.getElementById("pg-verdict");
+  var elMatNote = document.getElementById("pg-matnote");
+  var btnFix = document.getElementById("pg-fix");
+
+  // The real serve_batch_request_v1 array-building logic.
+  function build() {
+    var matches = [], validation = [];
+    for (var i = 0; i < requests.length; i++) {
+      var r = requests[i];
+      if (r.broken) {                       // wp_parse_url() returns false -> WP_Error
+        validation.push({ err: true });
+        if (fixed) matches.push({ err: true });   // the one-line fix
+        continue;                                  // vulnerable build skips $matches
+      }
+      matches.push({ handler: r.path });
+      validation.push({ ok: true });
+    }
+    return { matches: matches, validation: validation };
+  }
+
+  function esc(s){ return s.replace(/[&<>]/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
+
+  function render() {
+    var b = build();
+
+    // editor chips
+    elEdit.innerHTML = "";
+    requests.forEach(function (r, i) {
+      var chip = document.createElement("div");
+      chip.className = "pg-chip" + (r.broken ? " broken" : "");
+      chip.innerHTML =
+        '<span class="idx">[' + i + ']</span>' +
+        '<span class="path">' + esc(r.path) + '</span>' +
+        '<label><input type="checkbox" ' + (r.broken ? "checked" : "") + ' data-i="' + i + '" class="pg-brk"> malformed path</label>' +
+        '<button class="pg-x" data-i="' + i + '" title="remove">&times;</button>';
+      elEdit.appendChild(chip);
+    });
+
+    // $requests column
+    elReq.innerHTML = "";
+    requests.forEach(function (r, i) {
+      var c = document.createElement("div");
+      c.className = "pg-cell" + (r.broken ? " err" : "");
+      c.dataset.row = i;
+      c.innerHTML = '<span class="cidx">[' + i + ']</span><span class="body">' +
+        (r.broken ? "WP_Error (bad path)" : esc(r.path)) + '</span>';
+      elReq.appendChild(c);
+    });
+
+    // $matches column (rows are placed at their own array index)
+    elMat.innerHTML = "";
+    b.matches.forEach(function (m, i) {
+      var c = document.createElement("div");
+      c.className = "pg-cell" + (m.err ? " err" : "");
+      c.dataset.row = i;
+      c.innerHTML = '<span class="cidx">[' + i + ']</span><span class="body">' +
+        (m.err ? "(error)" : "handler(" + esc(m.handler) + ")") + '</span>';
+      elMat.appendChild(c);
+    });
+
+    elMatNote.textContent = b.matches.length < requests.length
+      ? "(" + (requests.length - b.matches.length) + " shorter than $requests)" : "";
+
+    // dispatch + verdict: for each non-broken request, which handler does it hit?
+    var firstMismatch = -1;
+    requests.forEach(function (r, i) {
+      if (r.broken) return;
+      var m = b.matches[i];
+      var mism = !m || m.err || m.handler !== r.path;
+      var reqCell = elReq.children[i];
+      var matCell = elMat.children[i];
+      if (mism) {
+        reqCell.classList.add("mism");
+        if (matCell) matCell.classList.add("mism");
+        if (firstMismatch < 0) firstMismatch = i;
+      } else {
+        reqCell.classList.add("okrow");
+        if (matCell) matCell.classList.add("okrow");
+      }
+    });
+
+    drawWires(b);
+
+    if (firstMismatch >= 0) {
+      var m = b.matches[firstMismatch];
+      var ranWhat = !m ? "no handler at all (undefined)" : (m.err ? "an error slot" : m.handler);
+      elVerdict.className = "pg-verdict bad";
+      elVerdict.innerHTML = "DESYNCED. Request [" + firstMismatch + "] <code>" +
+        esc(requests[firstMismatch].path) + "</code> is dispatched against <code>" +
+        esc(ranWhat) + "</code>, not its own handler. A malformed sub-request shifted $matches, so the permission check ran for the wrong request.";
+    } else {
+      elVerdict.className = "pg-verdict good";
+      elVerdict.innerHTML = "ALIGNED. Every request runs against its own handler and its own permission check." +
+        (fixed ? " The fix keeps $matches the same length as $requests." : " Mark a path malformed to trigger the desync.");
+    }
+  }
+
+  function drawWires(b) {
+    var stage = elWires.parentNode;
+    var sr = stage.getBoundingClientRect();
+    elWires.setAttribute("viewBox", "0 0 " + sr.width + " " + sr.height);
+    var ns = "http://www.w3.org/2000/svg";
+    elWires.innerHTML = "";
+    requests.forEach(function (r, i) {
+      if (r.broken) return;
+      var rc = elReq.children[i], mc = elMat.children[i];
+      if (!rc || !mc) return;
+      var a = rc.getBoundingClientRect(), c = mc.getBoundingClientRect();
+      var x1 = a.right - sr.left, y1 = a.top + a.height/2 - sr.top;
+      var x2 = c.left - sr.left,  y2 = c.top + c.height/2 - sr.top;
+      var m = b.matches[i];
+      var mism = !m || m.err || m.handler !== r.path;
+      var col = mism ? getCss("--alert") : getCss("--ok");
+      var path = document.createElementNS(ns, "path");
+      var mx = (x1 + x2) / 2;
+      path.setAttribute("d", "M " + x1 + " " + y1 + " C " + mx + " " + y1 + " " + mx + " " + y2 + " " + x2 + " " + y2);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", col);
+      path.setAttribute("stroke-width", mism ? "2.5" : "2");
+      path.setAttribute("opacity", mism ? "0.95" : "0.7");
+      elWires.appendChild(path);
+      var dot = document.createElementNS(ns, "circle");
+      dot.setAttribute("cx", x2); dot.setAttribute("cy", y2); dot.setAttribute("r", "3.5");
+      dot.setAttribute("fill", col);
+      elWires.appendChild(dot);
+    });
+  }
+
+  function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#888"; }
+
+  // events
+  elEdit.addEventListener("change", function (e) {
+    if (e.target.classList.contains("pg-brk")) {
+      requests[+e.target.dataset.i].broken = e.target.checked;
+      render();
+    }
+  });
+  elEdit.addEventListener("click", function (e) {
+    if (e.target.classList.contains("pg-x")) {
+      if (requests.length > 2) { requests.splice(+e.target.dataset.i, 1); render(); }
+    }
+  });
+  document.getElementById("pg-add").addEventListener("click", function () {
+    var n = requests.length;
+    requests.push({ path: "/wp/v2/posts/" + (n * 7), broken: false });
+    render();
+  });
+  document.getElementById("pg-reset").addEventListener("click", function () {
+    fixed = false; setFixBtn();
+    requests = [
+      { path: "http://:", broken: true },
+      { path: "/wp/v2/settings", broken: false },
+      { path: "/wp/v2/comments/42", broken: false },
+      { path: "/nonexistent-route", broken: false }
+    ];
+    render();
+  });
+  function setFixBtn(){
+    btnFix.setAttribute("aria-pressed", fixed ? "true" : "false");
+    btnFix.innerHTML = "Apply the fix (7.0.2): <b>" + (fixed ? "ON" : "OFF") + "</b>";
+  }
+  btnFix.addEventListener("click", function () { fixed = !fixed; setFixBtn(); render(); });
+
+  window.addEventListener("resize", function(){ render(); });
+  render();
+})();
+</script>
