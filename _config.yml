@@ -1,0 +1,25 @@
+title: "wp2shell: WordPress Batch RCE"
+description: "CVE-2026-63030: a REST API array desync in WordPress core that lets an anonymous request run under another request's handler. Mechanism, detection, mitigation, and a safe reproduction lab."
+lang: en
+
+# Render every markdown page through the Mermaid-enabled layout.
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
+# GitHub Pages enables jekyll-relative-links + jekyll-optional-front-matter by
+# default, so .md cross-links resolve to .html and front-matter-less files build.
+plugins:
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+
+# Keep personal LinkedIn drafts and lab runtime state OUT of the published site.
+exclude:
+  - batch-rce-lab/
+  - _site/
+  - .jekyll-cache/
+  - Gemfile
+  - Gemfile.lock
+  - vendor/

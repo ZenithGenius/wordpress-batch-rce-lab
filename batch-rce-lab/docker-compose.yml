@@ -1,0 +1,53 @@
+# wp2shell lab: a real, vulnerable WordPress on an isolated 127.0.0.1 network.
+# Nothing here reaches the internet. Nothing here is a weapon: the lab proves the
+# /batch/v1 desync (CVE-2026-63030) and lets you practise detection and mitigation.
+services:
+  db:
+    image: mariadb:10.11
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db:/var/lib/mysql
+    networks: [lab]
+
+  wp:
+    image: ${WP_IMAGE}
+    depends_on: [db]
+    ports:
+      - "127.0.0.1:${WP_PORT}:80"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - wp:/var/www/html
+    networks: [lab]
+
+  # One-shot installer, then idles so you can `docker compose exec wpcli ...`.
+  wpcli:
+    image: wordpress:cli-php8.3
+    depends_on: [wp]
+    user: "33:33"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+      WP_PORT: ${WP_PORT}
+    volumes:
+      - wp:/var/www/html
+      - ./setup:/setup:ro
+    networks: [lab]
+    entrypoint: ["sh", "/setup/wp-setup.sh"]
+
+networks:
+  lab:
+    driver: bridge
+
+volumes:
+  db:
+  wp:

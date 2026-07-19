@@ -1,0 +1,13 @@
+# --- Personal LinkedIn drafts, kept local, never published ---
+analysis/linkedin-*.md
+
+# --- Jekyll / GitHub Pages build output ---
+_site/
+.jekyll-cache/
+.jekyll-metadata
+vendor/
+.bundle/
+
+# --- OS / editor noise ---
+.DS_Store
+*.swp
