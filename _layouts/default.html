@@ -135,14 +135,15 @@
     .meta .v.amber { color: var(--amber); }
 
     /* ---- shell: trace rail + one readable column ---- */
-    .shell { max-width: 62rem; margin: 0 auto; padding: 3rem 2rem 5rem;
+    .shell { max-width: 78rem; margin: 0 auto; padding: 3rem 2rem 5rem;
              display: grid; grid-template-columns: minmax(0, 1fr); gap: 2.5rem; }
     @media (min-width: 1024px) {
-      .shell { grid-template-columns: 12.5rem minmax(0, 44rem); gap: 3rem;
-               justify-content: center; padding-top: 3.5rem; }
+      .shell { grid-template-columns: 14rem minmax(0, 1fr); gap: 4rem; padding-top: 3.5rem;
+               padding-left: 3rem; padding-right: 3rem; }
       /* pages with too few sections to navigate: single centred column, no empty rail */
-      .shell:has(.trace:empty) { grid-template-columns: minmax(0, 46rem); }
+      .shell:has(.trace:empty) { grid-template-columns: minmax(0, 62rem); justify-content: center; }
     }
+    @media (min-width: 100rem) { .shell { padding-left: 4rem; padding-right: 4rem; } }
     article { min-width: 0; }
     article > * { max-width: 100%; }
 
