@@ -1,0 +1,55 @@
+id: wp2shell-batch-desync
+
+info:
+  name: WordPress wp2shell Batch Array Desync (CVE-2026-63030)
+  author: Isaac Joumessi
+  severity: critical
+  description: |
+    Non-destructive detection for the wp2shell batch-endpoint array desync.
+    Sends one batch request containing a malformed sub-request path followed by a
+    real, non-batch route (/wp/v2/settings) and a nonexistent route. On a
+    vulnerable server the desync makes /wp/v2/settings answer with the NEXT
+    request's error (rest_no_route) instead of its own (rest_batch_not_allowed),
+    so a vulnerable response contains parse_path_failed but NOT rest_batch_not_allowed.
+    Sends only read/validation sub-requests: no write, no auth bypass, no data access.
+  reference:
+    - https://zenithgenius.github.io/wordpress-batch-rce-lab/analysis/mechanism.html
+    - https://nvd.nist.gov/vuln/detail/CVE-2026-63030
+  classification:
+    cve-id: CVE-2026-63030
+    cwe-id: CWE-670
+  metadata:
+    verified: true
+    shodan-query: 'http.component:"WordPress"'
+  tags: cve,cve2026,wordpress,wp,rce,wp2shell
+
+http:
+  - raw:
+      - |
+        POST /?rest_route=/batch/v1 HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/json
+
+        {"validation":"normal","requests":[{"method":"POST","path":"http://:"},{"method":"POST","path":"/wp/v2/settings"},{"method":"POST","path":"/wp/v2/wp2shell-nonexistent-zz"}]}
+
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: body
+        words:
+          - '"parse_path_failed"'
+          - '"rest_no_route"'
+        condition: and
+
+      # On a PATCHED server /wp/v2/settings answers for itself, so this string is
+      # present and the template must NOT flag. Its absence is the desync.
+      - type: word
+        part: body
+        words:
+          - '"rest_batch_not_allowed"'
+        negative: true
+
+      - type: status
+        status:
+          - 207
+          - 200

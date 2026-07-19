@@ -1,18 +1,25 @@
 #!/usr/bin/env bash
-# Restores the pristine, vulnerable class-wp-rest-server.php (undoes apply-fix.sh)
-# by extracting the untouched file straight from the vulnerable Docker image,
-# never by counting lines in an already-edited file.
+# Restores the pristine, vulnerable core files (undoes apply-fix.sh) by extracting
+# the untouched files straight from the vulnerable Docker image, never by editing
+# an already-patched file in place. Covers both wp2shell CVEs.
 set -euo pipefail
 
 IMAGE="${WP_IMAGE:-wordpress:7.0.1-php8.3-apache}"
-TARGET=/var/www/html/wp-includes/rest-api/class-wp-rest-server.php
-TMP="$(mktemp)"
+WPID="$(docker compose ps -q wp)"
+
+FILES="
+wp-includes/rest-api/class-wp-rest-server.php
+wp-includes/class-wp-query.php
+"
 
 CID=$(docker create "${IMAGE}")
-docker cp "${CID}:/usr/src/wordpress/wp-includes/rest-api/class-wp-rest-server.php" "${TMP}"
+for f in ${FILES}; do
+  TMP="$(mktemp)"
+  docker cp "${CID}:/usr/src/wordpress/${f}" "${TMP}"
+  docker cp "${TMP}" "${WPID}:/var/www/html/${f}"
+  rm -f "${TMP}"
+  echo "restored: ${f}"
+done
 docker rm "${CID}" >/dev/null
 
-docker cp "${TMP}" "$(docker compose ps -q wp):${TARGET}"
-rm -f "${TMP}"
-
-echo "restored the pristine vulnerable source from ${IMAGE}. Verify with ./probe.sh"
+echo "restore: done (both CVEs). Verify with ./probe.sh and ./sqli/probe-sqli.sh"

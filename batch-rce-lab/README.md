@@ -81,16 +81,55 @@ Same server, same request. `/wp/v2/settings` now answers for itself:
 RESULT: ALIGNED. Index [1] answered for itself, matching the control run.
 ```
 
-### 4. Restore the vulnerable state (toggle back and forth freely)
+### 4. The SQL injection half (CVE-2026-60137)
+
+The second bug is a SQL injection in `WP_Query`'s `author__not_in`. The `sqli/` module
+deploys a lab-only plugin that forwards a request parameter into that argument, exactly
+the precondition a vulnerable plugin or theme creates, and shows unsanitized input
+reaching the query:
 
 ```bash
-./restore-vuln.sh
-WP_PORT=8028 ./probe.sh    # DESYNCED again
+WP_PORT=8028 ./sqli/probe-sqli.sh
 ```
 
-`apply-fix.sh` and `restore-vuln.sh` are idempotent and can be run in either order, any number of times, to compare before/after as much as you want.
+On vulnerable core, a bare-word marker reaches the SQL `WHERE` clause and breaks the
+query's syntax, so the database returns an error:
 
-### 5. Tear down
+```
+== 2. Injection marker: exclude=wp2shell_marker) ==
+  SINK: db_error
+  unsanitized input reached the SQL WHERE clause.
+  error: You have an error in your SQL syntax ... near ')  AND ...
+
+RESULT: VULNERABLE. The marker reached the SQL WHERE clause verbatim ...
+```
+
+It only ever triggers a benign syntax error: it runs an ordinary `SELECT` and extracts
+no data. After `./apply-fix.sh`, `wp_parse_id_list()` coerces the marker to an integer
+and the error disappears.
+
+### 5. Correction and restore (toggles BOTH CVEs)
+
+```bash
+./apply-fix.sh      # applies the real upstream fix for BOTH the batch desync and the SQLi
+./restore-vuln.sh   # re-extracts pristine vulnerable source for both files from the image
+```
+
+`apply-fix.sh` and `restore-vuln.sh` are idempotent and can be run in either order, any
+number of times. `apply-fix.sh` patches both `class-wp-rest-server.php` (batch) and
+`class-wp-query.php` (SQLi), mirroring what updating to 7.0.2 actually does. Re-run
+`./probe.sh` and `./sqli/probe-sqli.sh` to see both flip.
+
+### 6. Portable detections
+
+`detect/` ships Sigma rules and a non-destructive Nuclei template. The Nuclei template
+was verified to fire on the vulnerable instance and stay silent once patched:
+
+```bash
+nuclei -u "http://localhost:8028" -t detect/wp2shell-batch-desync.yaml
+```
+
+### 7. Tear down
 
 ```bash
 docker compose down -v      # stop everything and remove volumes
@@ -121,8 +160,10 @@ docker-compose.yml   wordpress:7.0.1 (real, vulnerable) + mariadb + wp-cli insta
 .env                 image tag, host port, DB credentials
 setup/wp-setup.sh    one-time WordPress install, then idle for exec
 demo-desync.php      standalone PHP model of the array desync, no WordPress needed
-probe.sh             live HTTP proof: control vs attack-shaped batch, safe (no write, no auth bypass)
-apply-fix.sh         applies the real upstream one-line patch to the running container's source
-restore-vuln.sh      re-extracts the pristine vulnerable file from the image, undoing apply-fix.sh
+probe.sh             live HTTP proof of the batch desync, safe (no write, no auth bypass)
+sqli/                CVE-2026-60137: lab-only author__not_in sink plugin + safe probe
+apply-fix.sh         applies the real upstream fix for BOTH CVEs to the running source
+restore-vuln.sh      re-extracts the pristine vulnerable files from the image, undoing apply-fix.sh
+detect/              portable Sigma rules + a verified non-destructive Nuclei template
 mitigate/            drop-in mu-plugin + WAF rule snippets (nginx/Apache/ModSecurity)
 ```

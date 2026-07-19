@@ -92,6 +92,8 @@ Index 0 is discarded as a parse error. Index 1 now runs against the route and ha
 
 No packaged patched WordPress Docker image existed at the time of writing (Docker Hub had not yet published a `7.0.2` build), so the [lab](https://github.com/ZenithGenius/wordpress-batch-rce-lab/tree/main/batch-rce-lab) proves this on the vulnerable server itself: run a genuinely vulnerable `wordpress:7.0.1` container, observe the desync over HTTP with two harmless, read-shaped requests, then apply the real one-line patch to that same running server's source and watch the identical request answer correctly.
 
+![Terminal recording: the same probe against the same server. Before the patch, /wp/v2/settings answers rest_no_route (the wrong route's error) and the probe reports DESYNCED; after apply-fix.sh, the identical request answers rest_batch_not_allowed and the probe reports ALIGNED.](../assets/wp2shell-lab.gif)
+
 Two fingerprint routes make the desync visible without any write or auth bypass:
 
 | Route | Exists? | Correct standalone answer |

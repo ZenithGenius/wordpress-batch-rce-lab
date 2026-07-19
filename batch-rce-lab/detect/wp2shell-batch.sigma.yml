@@ -1,0 +1,66 @@
+title: WordPress wp2shell Batch Endpoint Abuse (CVE-2026-63030)
+id: 8f1e2c94-3a6b-4d21-9f7a-wp2shellbatch01
+status: experimental
+description: >
+  Detects anonymous POST requests to the WordPress REST batch endpoint that carry
+  a malformed sub-request path, the trigger for the CVE-2026-63030 array desync.
+  Both URL shapes are covered: /wp-json/batch/v1 and ?rest_route=/batch/v1.
+  Legitimate batch traffic (block editor, WooCommerce Store API) is authenticated
+  and never contains a deliberately unparseable path.
+references:
+  - https://zenithgenius.github.io/wordpress-batch-rce-lab/
+  - https://nvd.nist.gov/vuln/detail/CVE-2026-63030
+author: Isaac Joumessi
+date: 2026/07/19
+tags:
+  - attack.initial_access
+  - attack.t1190
+  - cve.2026.63030
+logsource:
+  category: webserver
+detection:
+  method_post:
+    cs-method: POST
+  endpoint_path:
+    cs-uri-stem|contains:
+      - '/wp-json/batch/v1'
+  endpoint_query:
+    cs-uri-query|contains:
+      - 'rest_route=/batch/v1'
+      - 'rest_route=%2Fbatch%2Fv1'
+  # Only fires when the request body is logged (WAF / reverse proxy body capture).
+  malformed_path_marker:
+    c-body|contains:
+      - '"path":"http://:"'
+      - '"path":"http:///'
+  condition: method_post and (endpoint_path or endpoint_query) and malformed_path_marker
+fields:
+  - c-ip
+  - cs-uri-stem
+  - cs-uri-query
+falsepositives:
+  - None expected; a malformed batch sub-request path is not produced by normal clients.
+level: high
+---
+# Fallback for environments WITHOUT request-body logging: flag any ANONYMOUS POST
+# to the batch endpoint at all. Tune out your own authenticated automation by IP.
+title: WordPress Batch Endpoint Anonymous POST (no body logging)
+id: 8f1e2c94-3a6b-4d21-9f7a-wp2shellbatch02
+status: experimental
+logsource:
+  category: webserver
+detection:
+  method_post:
+    cs-method: POST
+  endpoint:
+    cs-uri-stem|contains: '/wp-json/batch/v1'
+  endpoint_query:
+    cs-uri-query|contains:
+      - 'rest_route=/batch/v1'
+      - 'rest_route=%2Fbatch%2Fv1'
+  no_cookie:
+    cs-cookie|contains: 'wordpress_logged_in'
+  condition: method_post and (endpoint or endpoint_query) and not no_cookie
+falsepositives:
+  - Unauthenticated automation that legitimately uses batch (rare); allowlist by source IP.
+level: medium

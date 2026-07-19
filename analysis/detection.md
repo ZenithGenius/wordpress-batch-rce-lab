@@ -59,6 +59,33 @@ batch call. An `Undefined array key` or `Trying to access array offset` notice
 originating from `class-wp-rest-server.php` during a batch request is worth
 correlating with the access-log hit above.
 
+## The SQL injection signature
+
+The second bug, [CVE-2026-60137](./sqli-chain.html), has its own fingerprint. A
+legitimate `author__not_in` value is only digits and commas. Anything else in that
+parameter, a quote, a parenthesis, a SQL keyword, is an injection attempt.
+
+```bash
+# author__not_in carrying non-integer content
+grep -E 'author__not_in[^&]*(%27|%28|%29|SELECT|UNION|SLEEP|--)' access.log
+```
+
+Plugins often map their own request parameters onto `author__not_in`, so also watch
+for SQL metacharacters in any parameter feeding an author filter, not just the raw
+query var name.
+
+## Portable detection artifacts
+
+The lab ships ready-to-run rules in [`batch-rce-lab/detect/`](https://github.com/ZenithGenius/wordpress-batch-rce-lab/tree/main/batch-rce-lab/detect):
+
+- **Sigma** (`wp2shell-batch.sigma.yml`, `wp2shell-sqli.sigma.yml`): SIEM-portable log
+  rules for the batch-endpoint abuse and the `author__not_in` injection, with a
+  body-logging variant and a no-body-logging fallback.
+- **Nuclei** (`wp2shell-batch-desync.yaml`): a non-destructive template that confirms
+  the batch desync by observing that `/wp/v2/settings` answers with the wrong route's
+  error. It sends only read/validation sub-requests and was verified to fire on a
+  vulnerable instance and stay silent on a patched one.
+
 ## After the fact
 
 wp2shell chains to a SQL injection (CVE-2026-60137) and then code execution, so a

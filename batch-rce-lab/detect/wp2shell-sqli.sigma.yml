@@ -1,0 +1,42 @@
+title: WordPress author__not_in SQL Injection Indicators (CVE-2026-60137)
+id: 7b2d9a10-6c14-49e8-b3aa-wp2shellsqli001
+status: experimental
+description: >
+  Detects request parameters carrying non-integer values into WordPress's
+  author__not_in query variable, the sink for CVE-2026-60137. In a benign request
+  author__not_in is always a list of integers; any SQL metacharacter in its value
+  indicates an injection attempt. Covers the raw query var and common REST params
+  that plugins map onto it.
+references:
+  - https://zenithgenius.github.io/wordpress-batch-rce-lab/analysis/sqli-chain.html
+  - https://nvd.nist.gov/vuln/detail/CVE-2026-60137
+author: Isaac Joumessi
+date: 2026/07/19
+tags:
+  - attack.initial_access
+  - attack.t1190
+  - cve.2026.60137
+logsource:
+  category: webserver
+detection:
+  author_param:
+    cs-uri-query|contains:
+      - 'author__not_in'
+  sqli_metachars:
+    cs-uri-query|contains:
+      - '%27'         # single quote
+      - '%28'         # (
+      - '%29'         # )
+      - 'SELECT'
+      - 'UNION'
+      - 'SLEEP'
+      - 'BENCHMARK'
+      - '--'
+      - '/*'
+  condition: author_param and sqli_metachars
+fields:
+  - c-ip
+  - cs-uri-query
+falsepositives:
+  - Rare. A legitimate author__not_in value is only digits and commas.
+level: high

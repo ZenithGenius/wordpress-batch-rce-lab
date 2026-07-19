@@ -29,13 +29,17 @@ flowchart TB
 
 ## Read the writeup
 
-**[The mechanism](./analysis/mechanism.html).** How `WP_REST_Server::serve_batch_request_v1()` builds two parallel arrays, how one malformed sub-request desyncs them, and the exact one-line diff between vulnerable 7.0.1 and patched 7.0.2. Includes a live, safe proof against genuinely vulnerable WordPress: the same request, on the same server, answering wrong before the patch and right after it.
+**[The batch mechanism](./analysis/mechanism.html).** How `WP_REST_Server::serve_batch_request_v1()` builds two parallel arrays, how one malformed sub-request desyncs them, and the exact one-line diff between vulnerable 7.0.1 and patched 7.0.2. Includes a live, safe proof against genuinely vulnerable WordPress: the same request, on the same server, answering wrong before the patch and right after it.
 
-**[Detection](./analysis/detection.html).** The request fingerprint, access-log hunting queries, and the PHP error-log tell that distinguishes a real attack attempt from routine batch traffic.
+**[The SQL injection half](./analysis/sqli-chain.html).** CVE-2026-60137: an `is_array()`-gated sanitization bypass in `WP_Query`'s `author__not_in`, why a string value skips `absint` and lands raw in the query, and how the batch desync lifts it from an authenticated-only bug to an unauthenticated one.
 
-**[Indicators and mitigation](./analysis/IOCs.html).** WAF rules for nginx, Apache, and ModSecurity covering both URL shapes of the endpoint, plus a drop-in mu-plugin that blocks anonymous batch calls as a stop-gap ahead of patching.
+**[Detection](./analysis/detection.html).** The request fingerprints for both bugs, access-log hunting queries, and the PHP error-log tells that distinguish real attack attempts from routine traffic.
 
-**[The reproduction lab](https://github.com/ZenithGenius/wordpress-batch-rce-lab/tree/main/batch-rce-lab).** Docker Compose running real, vulnerable WordPress 7.0.1. A safe HTTP proof toggles between the vulnerable and patched source on the same running server and shows the response flip. A standalone PHP model reproduces the array desync with no WordPress at all.
+**[The bug class](./analysis/bug-class.html).** Why "two arrays that must stay index-aligned" is a recurring defect pattern in request-multiplexing endpoints, and the defensive lesson that generalizes past this one CVE.
+
+**[Indicators and mitigation](./analysis/IOCs.html).** WAF rules for nginx, Apache, and ModSecurity covering both URL shapes of the endpoint, portable Sigma and Nuclei detections, plus a drop-in mu-plugin that blocks anonymous batch calls as a stop-gap ahead of patching.
+
+**[The reproduction lab](https://github.com/ZenithGenius/wordpress-batch-rce-lab/tree/main/batch-rce-lab).** Docker Compose running real, vulnerable WordPress 7.0.1. Safe HTTP proofs of both the batch desync and the SQLi sink toggle between vulnerable and patched source on the same running server. A standalone PHP model reproduces the array desync with no WordPress at all.
 
 ## The one-line fix
 
@@ -57,4 +61,4 @@ Adam Kues, Assetnote (Searchlight Cyber's attack-surface-management arm), discov
 
 ## Disclosure
 
-This writeup and lab were built after WordPress's public fix (7.0.2 / 6.9.5) and Searchlight's public advisory. The array-desync mechanism (CVE-2026-63030) is reproduced in full, safely, because it requires only read-shaped requests to observe. The SQL-injection chain (CVE-2026-60137) that turns the desync into code execution is described conceptually only; no working SQLi or RCE payload is published here. If you run WordPress, update to 7.0.2 or 6.9.5, or apply the mitigations linked above, before experimenting with any of this.
+This writeup and lab were built after WordPress's public fix (6.8.6 / 6.9.5 / 7.0.2) and the public advisories. Both bugs are covered at a mechanism level, grounded in the real source diff. The batch desync (CVE-2026-63030) is reproduced in full because it needs only read-shaped requests to observe. The SQL injection (CVE-2026-60137) is demonstrated only far enough to prove that unsanitized input reaches the query, via a benign syntax error, extracting no data; the full SQLi-to-RCE chain is described conceptually only, and no working exploit payload is published here. If you run WordPress, update to 6.8.6, 6.9.5, or 7.0.2, or apply the mitigations linked above, before experimenting with any of this.
